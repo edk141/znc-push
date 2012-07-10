@@ -10,12 +10,13 @@
 
 #define REQUIRESSL
 
-#include "znc.h"
-#include "Chan.h"
-#include "User.h"
-#include "Modules.h"
+#include <znc/znc.h>
+#include <znc/Chan.h>
+#include <znc/User.h>
+#include <znc/IRCNetwork.h>
+#include <znc/Modules.h>
+#include <znc/FileUtils.h>
 #include "time.h"
-#include "FileUtils.h"
 
 #if (!defined(VERSION_MAJOR) || !defined(VERSION_MINOR) || (VERSION_MAJOR == 0 && VERSION_MINOR < 72))
 #error This module needs ZNC 0.072 or newer.
@@ -445,9 +446,9 @@ class CPushMod : public CModule
 		{
 #ifdef PUSH_AWAY
 			CString value = options["away_only"].AsLower();
-			return value != "yes" || user->IsIRCAway();
+			return value != "yes" || GetNetwork()->IsIRCAway();
 #else
-			return true
+			return true;
 #endif
 		}
 
@@ -458,7 +459,8 @@ class CPushMod : public CModule
 		 */
 		unsigned int client_count()
 		{
-			return user->GetClients().size();
+			unsigned int count = user->GetUserClients().size();
+			return (count < 1 && user->IsUserAttached()) ? 1 : count;
 		}
 
 		/**
@@ -509,7 +511,7 @@ class CPushMod : public CModule
 				}
 			}
 
-			CNick nick = user->GetIRCNick();
+			CNick nick = user->GetNick();
 
 			if (message.find(nick.GetNick()) != string::npos)
 			{
@@ -692,7 +694,8 @@ class CPushMod : public CModule
 		{
 			if (notify_channel(nick, channel, message))
 			{
-				CString title = "Highlight";
+				CString title = "Highlight in ";
+				title += channel.GetName() + " by " + nick.GetNick();
 				CString msg = channel.GetName();
 				msg += ": <" + nick.GetNick();
 				msg += "> " + message;
@@ -714,7 +717,8 @@ class CPushMod : public CModule
 		{
 			if (notify_channel(nick, channel, message))
 			{
-				CString title = "Highlight";
+				CString title = "Highlight in ";
+				title += channel.GetName() + " by " + nick.GetNick();
 				CString msg = channel.GetName();
 				msg += ": " + nick.GetNick();
 				msg += " " + message;
@@ -735,7 +739,8 @@ class CPushMod : public CModule
 		{
 			if (notify_pm(nick, message))
 			{
-				CString title = "Private Message";
+				CString title = "Private Message from ";
+				title += nick.GetNick();
 				CString msg = "From " + nick.GetNick();
 				msg += ": " + message;
 
@@ -755,7 +760,8 @@ class CPushMod : public CModule
 		{
 			if (notify_pm(nick, message))
 			{
-				CString title = "Private Message";
+				CString title = "Private Message from ";
+				title += nick.GetNick();
 				CString msg = "* " + nick.GetNick();
 				msg += " " + message;
 
@@ -1124,7 +1130,7 @@ class CPushMod : public CModule
 #ifdef PUSH_AWAY
 				table.AddRow();
 				table.SetCell("Condition", "away");
-				table.SetCell("Status", user->IsIRCAway() ? "yes" : "no");
+				table.SetCell("Status", GetNetwork()->IsIRCAway() ? "yes" : "no");
 #endif
 
 				table.AddRow();
